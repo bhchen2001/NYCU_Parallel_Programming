@@ -12,18 +12,18 @@ pthread_mutex_t num_circle_mutex;
 void *pi_estimate(void *arg){
     long long int num_task = *(int*)arg;
     long long int number_in_circle_local = 0;
-    unsigned int seed = 1;
+    // thread safe random number generator
+    unsigned int seed = time(NULL);
     for(long long int i = 0; i < num_task; i++){
         double x, y;
-        x = rand_r(&seed) / RAND_MAX;
-        y = rand_r(&seed) / RAND_MAX;
+        x = (double)rand_r(&seed) / RAND_MAX;
+        y = (double)rand_r(&seed) / RAND_MAX;
         x = -1 + x * 2;
         y = -1 + y * 2;
 
         double distance_squared = x * x + y * y;
         if(distance_squared <= 1) number_in_circle_local++;
     }
-    cout << "task_num: " << num_task << endl;
     pthread_mutex_lock(&num_circle_mutex);
     number_in_circle += number_in_circle_local;
     pthread_mutex_unlock(&num_circle_mutex);
@@ -47,8 +47,6 @@ int main(int argc, char* argv[]){
     pthread_mutex_init(&num_circle_mutex, NULL);
     
     for(int i = 0; i < num_th; i++){
-        // pthread_attr_t th_attr;
-        // pthread_attr_init(&th_attr);
         pthread_create((thread_pool + i), NULL, *pi_estimate, (void*)&num_task);
     }
 

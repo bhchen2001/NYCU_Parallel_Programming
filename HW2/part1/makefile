@@ -1,14 +1,11 @@
 CC=g++
 SRC=pi_pthread
-PFLAG=-lpthread
+PFLAG=-lpthread -march=native
 
-all:
-	# please refer the flag time/gprof/perf/run
+all:$(SRC).out
 
-run: $(SRC).out
-
-$(SRC).out: $(SRC).cpp $(SRC).o
+$(SRC).out: $(SRC).cpp
 	$(CC) $(SRC).cpp -o $(SRC).out $(PFLAG)
 
-rm:
+clean:
 	rm -f *.out *.o profiling_result perf.*
