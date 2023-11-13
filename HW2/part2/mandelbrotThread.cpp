@@ -47,7 +47,7 @@ void workerThreadStart(WorkerArgs *const args)
     //                  args->maxIterations,
     //                  args->output);
     int row_cal = 1;
-    for(int i = 0; i < int(args->height); i+=row_cal * args->numThreads){
+    for(int i = 0; i + args->threadId * row_cal < int(args->height); i+=row_cal * args->numThreads){
         mandelbrotSerial(args->x0, args->y0, args->x1, args->y1,
                          args->width, args->height,
                          i + args->threadId * row_cal, row_cal,
