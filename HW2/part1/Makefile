@@ -1,6 +1,6 @@
 CC=g++
-SRC=pi
-FLAGS= -lpthread -march=native
+SRC=pi_avx2
+FLAGS= -lpthread -march=native -mavx2 -ffast-math -O3
 
 all:$(SRC).out
 
