@@ -56,4 +56,35 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
      }
 
    */
+
+  bool converged = false;
+  double *score_new = (double *)malloc(sizeof(double) * numNodes);
+  double tmp = 0.0, global_diff = 0.0, no_outgoing = 0.0;
+  while(!converged){
+    no_outgoing = 0.0;
+    #pragma omp parallel for reduction(+:no_outgoing)
+    for(int i = 0; i < numNodes; i++){
+        if(outgoing_size(g, i) == 0){
+            no_outgoing += damping * solution[i] / numNodes;
+        }
+    }
+    global_diff = 0.0;
+    #pragma omp parallel for reduction(+:global_diff)
+    for(int i = 0; i < numNodes; i++){
+        tmp = 0.0;
+        for(const Vertex *j = incoming_begin(g, i); j != incoming_end(g, i); j++){
+            tmp += solution[*j]/(double)outgoing_size(g, *j);
+        }
+        tmp = (damping * tmp) + (1.0 - damping) / numNodes;
+        tmp += no_outgoing;
+        score_new[i] = tmp;
+        global_diff += abs(tmp - solution[i]);
+    }
+    #pragma omp parallel for
+    for(int i = 0; i < numNodes; i++){
+        solution[i] = score_new[i];
+    }
+    converged = (global_diff < convergence);
+  }
+  free(score_new);
 }
