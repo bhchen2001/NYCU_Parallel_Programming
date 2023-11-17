@@ -11,6 +11,7 @@
 
 #define ROOT_NODE_ID 0
 #define NOT_VISITED_MARKER -1
+#define VERBOSE 0
 
 void vertex_set_clear(vertex_set *list)
 {
@@ -33,6 +34,7 @@ void top_down_step(
     vertex_set *new_frontier,
     int *distances)
 {
+    #pragma omp for
     for (int i = 0; i < frontier->count; i++)
     {
 
@@ -47,12 +49,19 @@ void top_down_step(
         for (int neighbor = start_edge; neighbor < end_edge; neighbor++)
         {
             int outgoing = g->outgoing_edges[neighbor];
-
-            if (distances[outgoing] == NOT_VISITED_MARKER)
             {
-                distances[outgoing] = distances[node] + 1;
-                int index = new_frontier->count++;
-                new_frontier->vertices[index] = outgoing;
+                if (__sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, distances[node] + 1))
+                {
+                    // __sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, distances[node] + 1);
+                    // #pragma omp critical
+                    // {
+                    //     distances[outgoing] = distances[node] + 1;
+                    //     int index = new_frontier->count++;
+                    //     new_frontier->vertices[index] = outgoing;
+                    // }
+                    int index = new_frontier->count++;
+                    new_frontier->vertices[index] = outgoing;
+                }
             }
         }
     }
@@ -74,6 +83,7 @@ void bfs_top_down(Graph graph, solution *sol)
     vertex_set *new_frontier = &list2;
 
     // initialize all nodes to NOT_VISITED
+    #pragma omp parallel for
     for (int i = 0; i < graph->num_nodes; i++)
         sol->distances[i] = NOT_VISITED_MARKER;
 
