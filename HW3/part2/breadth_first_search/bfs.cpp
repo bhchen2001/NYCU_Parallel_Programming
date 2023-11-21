@@ -171,7 +171,7 @@ void bottom_up_step(
     // int depth = distances[frontier->vertices[0]];
     int *incoming_edges = g->incoming_edges;
 
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(dynamic, 1024)
     for(int node_idx = 0; node_idx < g->num_nodes; node_idx++){
         int node = node_idx;
         if(distances[node] != NOT_VISITED_MARKER){
@@ -281,10 +281,124 @@ void bfs_bottom_up(Graph graph, solution *sol)
     free(list2.bitmap);
 }
 
+void set_to_bitmap(vertex_set *set, vertex_bitmap *bitmap)
+{
+    vertex_bitmap_clear(bitmap);
+    for(int i = 0; i < set->count; i++){
+        vertex_bitmap_set(bitmap, set->vertices[i]);
+    }
+}
+
+void bitmap_to_set(vertex_bitmap *bitmap, vertex_set *set)
+{
+    vertex_set_clear(set);
+    for(int i = 0; i < bitmap->size; i++){
+        if(bitmap->bitmap[i]){
+            set->vertices[set->count++] = i;
+        }
+    }
+}
+
 void bfs_hybrid(Graph graph, solution *sol)
 {
     // For PP students:
     //
     // You will need to implement the "hybrid" BFS here as
     // described in the handout.
+
+    vertex_set set_list1;
+    vertex_set set_list2;
+    vertex_set_init(&set_list1, graph->num_nodes);
+    vertex_set_init(&set_list2, graph->num_nodes);
+
+    vertex_set *set_frontier = &set_list1;
+    vertex_set *set_new_frontier = &set_list2;
+
+    vertex_bitmap bitmap_list1;
+    vertex_bitmap bitmap_list2;
+    vertex_bitmap_init(&bitmap_list1, graph->num_nodes);
+    vertex_bitmap_init(&bitmap_list2, graph->num_nodes);
+
+    vertex_bitmap *bitmap_frontier = &bitmap_list1;
+    vertex_bitmap *bitmap_new_frontier = &bitmap_list2;
+
+    // initialize all nodes to NOT_VISITED
+    #pragma omp parallel for
+    for (int i = 0; i < graph->num_nodes; i++)
+        sol->distances[i] = NOT_VISITED_MARKER;
+
+    // setup frontier with the root node
+    set_frontier->vertices[set_frontier->count++] = ROOT_NODE_ID;
+    sol->distances[ROOT_NODE_ID] = 0;
+    // flag = true--> top-down, flag = false --> bottom-up
+    // initial state: top-down
+    bool flag = true;
+
+    int alpha = 15, beta = 24;
+    while (1)
+    {
+        // printf("flag = %d, set_frontier->count = %d, bitmap_frontier->count = %d\n", flag, set_frontier->count, bitmap_frontier->count);
+        if((flag == true && set_frontier->count == 0) || (flag == false && bitmap_frontier->count == 0))
+            break;
+        if(flag == true){
+
+            vertex_set_clear(set_new_frontier);
+            top_down_step(graph, set_frontier, set_new_frontier, sol->distances);
+
+            // swap pointers
+            vertex_set *tmp_set = set_frontier;
+            set_frontier = set_new_frontier;
+            set_new_frontier = tmp_set;
+            
+            // check mf and c_tb
+            // mf: summing the degrees of the frontier nodes
+            double mf = 0;
+            #pragma omp parallel for reduction(+:mf)
+            for(int i = 0; i < set_frontier->count; i++){
+                int node = set_frontier->vertices[i];
+                int start_edge = graph->outgoing_starts[node];
+                int end_edge = (node == graph->num_nodes - 1)
+                                ? graph->num_edges
+                                : graph->outgoing_starts[node + 1];
+                mf += end_edge - start_edge;
+            }
+
+            // mu: counting how many edges have been checked
+            double mu = 0;
+            #pragma omp parallel for reduction(+:mu)
+            for(int i = 0; i < graph->num_nodes; i++){
+                int start_edge = graph->outgoing_starts[i];
+                int end_edge = (i == graph->num_nodes - 1)
+                                ? graph->num_edges
+                                : graph->outgoing_starts[i + 1];
+                mu += end_edge - start_edge;
+            }
+
+            double c_tb = mu / alpha;
+            // printf("mf = %f, c_tb = %f\n", mf, c_tb);
+            if(mf > c_tb){
+                set_to_bitmap(set_frontier, bitmap_frontier);
+                flag = false;
+            }
+        }
+        else{
+            vertex_bitmap_clear(bitmap_new_frontier);
+            bottom_up_step(graph, bitmap_frontier, bitmap_new_frontier, sol->distances);
+
+            // swap pointers
+            vertex_bitmap *tmp_bitmap = bitmap_frontier;
+            bitmap_frontier = bitmap_new_frontier;
+            bitmap_new_frontier = tmp_bitmap;
+            
+            // check nf and c_bt
+            // nf: counting the number of vertices added to the frontier
+            double nf = bitmap_frontier->count;
+
+            double c_bt = graph->num_nodes / beta;
+            if(nf < c_bt){
+                bitmap_to_set(bitmap_frontier, set_frontier);
+                flag = true;
+            }
+        }
+    }
 }
