@@ -1,0 +1,1 @@
+parallel-scp -h host.txt -r ~/HW4/ ~/
