@@ -23,11 +23,13 @@ int main(int argc, char **argv)
     long long int number_in_circle = 0;
     long long int number_in_circle_local = 0;
     long long int local_tosses = tosses / world_size;
-    unsigned int seed = time(0) * world_rank;
+    unsigned int seed =  time(0) * (world_rank + 1);
 
     for(long long int i = 0; i < local_tosses; i++){
-        double x = (double)rand_r(&seed) / RAND_MAX * 2.0 - 1.0;
-        double y = (double)rand_r(&seed) / RAND_MAX * 2.0 - 1.0;
+        double x = (double)rand_r(&seed) / RAND_MAX;
+        double y = (double)rand_r(&seed) / RAND_MAX;
+        x = -1 + x * 2;
+        y = -1 + y * 2;
         double distance_squared = x * x + y * y;
         if (distance_squared <= 1){
             number_in_circle_local++;
@@ -52,7 +54,7 @@ int main(int argc, char **argv)
         for (int i = 1; i < world_size; i++){
             MPI_Irecv(&number_in_circle_rcv[i - 1], 1, MPI_LONG_LONG_INT, i, 0, MPI_COMM_WORLD, &requests[i - 1]);
         }
-        MPI_Waitall(world_size - 1, requests, MPI_STATUSES_IGNORE);
+        MPI_Waitall(world_size - 1, requests, MPI_STATUS_IGNORE);
         for (int i = 0; i < world_size - 1; i++){
             number_in_circle += number_in_circle_rcv[i];
         }

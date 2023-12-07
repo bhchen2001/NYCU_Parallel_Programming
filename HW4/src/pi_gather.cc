@@ -21,11 +21,14 @@ int main(int argc, char **argv)
     long long int number_in_circle = 0;
     long long int number_in_circle_local = 0;
     long long int local_tosses = tosses / world_size;
-    unsigned int seed = time(0) * world_rank;
+    long long int *number_in_circle_rcv = new long long int[world_size];
+    unsigned int seed =  time(0) * (world_rank + 1);
 
     for(long long int i = 0; i < local_tosses; i++){
-        double x = (double)rand_r(&seed) / RAND_MAX * 2.0 - 1.0;
-        double y = (double)rand_r(&seed) / RAND_MAX * 2.0 - 1.0;
+        double x = (double)rand_r(&seed) / RAND_MAX;
+        double y = (double)rand_r(&seed) / RAND_MAX;
+        x = -1 + x * 2;
+        y = -1 + y * 2;
         double distance_squared = x * x + y * y;
         if (distance_squared <= 1){
             number_in_circle_local++;
@@ -33,7 +36,6 @@ int main(int argc, char **argv)
     }
 
     // TODO: use MPI_Gather
-    long long int *number_in_circle_rcv = new long long int[world_size];
     MPI_Gather(&number_in_circle_local, 1, MPI_LONG_LONG_INT, number_in_circle_rcv, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
 
     if (world_rank == 0)
